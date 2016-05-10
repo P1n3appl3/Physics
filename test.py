@@ -10,8 +10,8 @@ def main():
 	screen = pygame.display.set_mode(screenSize)
 
 	currentTime = time.clock()
-	currentSecond = int(time.time())
-	dt = 0.
+	dt = accumulator = 0.
+	fps = 1. / 60
 
 	# defining shapes
 	shapes = [AABB(0, 0, 0, screenHeight),
@@ -29,24 +29,21 @@ def main():
 			if event.type == pygame.QUIT:
 				sys.exit()
 
-		for s in shapes:
-			s.move(dt)
-
-		if testCircle2.collision(testCircle1):
-			print "contact"
-
 		# time calculations
 		dt = time.clock() - currentTime
 		currentTime = time.clock()
-		if int(time.time()) > currentSecond:
-			currentSecond += 1
+		accumulator += dt;
+		if accumulator > fps:
+			accumulator -= fps
+			for s in shapes:
+				s.move(fps)
 
 		# drawing
 		screen.fill((0, 0, 0))
 		for s in shapes:
 			s.draw(screen)
 		pygame.display.flip()
-		time.sleep(.005)
+		#time.sleep(.005)
 
 
 if __name__ == "__main__":
