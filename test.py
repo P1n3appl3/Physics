@@ -2,7 +2,6 @@ import sys
 import pygame
 import time
 import engine
-import math
 
 
 def main():
