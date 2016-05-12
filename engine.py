@@ -1,12 +1,11 @@
 from abc import abstractmethod
 import pygame
+import math
 
 
 class Entity:
-	x = 0
-	y = 0
-	dx = 0
-	dy = 0
+	"""Parent class for all physics objects"""
+	dx = dy = dz = 0.
 	color = (255, 255, 255)
 	fixed = False
 	mass = 1.
@@ -18,26 +17,27 @@ class Entity:
 		return
 
 	@abstractmethod
-	def collision(self, other):
+	def rotate(self, (x, y), ang=math.pi / 4):
 		return
 
-	def move(self, dt):
-		self.x += self.dx
-		self.y += self.dy
+	@abstractmethod
+	def center(self):
+		return
 
-	def applyImpulse(self, a, b):
-		self.dx += a
-		self.dy += b
+	@abstractmethod
+	def move(self, fps):
+		return
 
 
 class Circle(Entity):
 	radius = 1
+	points = x, y = (0, 0)
 
-	def __init__(self, x, y, r, color=(255, 255, 255)):
+	def __init__(self, (x, y), r, c=(255, 255, 255)):
 		self.x = x
 		self.y = y
 		self.radius = r
-		self.color = color
+		self.color = c
 
 	def draw(self, s):
 		pygame.draw.circle(s, self.color, (int(self.x), int(self.y)), self.radius)
@@ -48,24 +48,56 @@ class Circle(Entity):
 		else:
 			return False
 
+	def rotate(self, (x, y), ang=math.pi / 4):
+		return
 
-class AABB(Entity):
-	height = 1
-	width = 1
+	def center(self):
+		return self.x, self.y
 
-	def __init__(self, x, y, w, h, color=(255, 255, 255)):
-		self.x = x
-		self.y = y
-		self.height = h
-		self.width = w
-		self.color = color
+	def move(self, fps):
+		self.x += self.dx * fps
+		self.y += self.dy * fps
+
+
+class Polygon(Entity):
+	"""Convex polygon"""
+	points = [(0, 0)]
+
+	def __init__(self, p, c=(255, 255, 255)):
+		self.points = p
+		self.color = c
 
 	def draw(self, s):
-		pygame.draw.rect(s, self.color, (self.x, self.y, self.width, self.height))
+		pygame.draw.polygon(s, self.color, self.points, 0)
 
-	def collision(self, other):
-		if isinstance(other, AABB):
-			return not (self.x > other.x + other.width or self.y > other.y + other.height or
-			            self.x + self.width < other.x or self.y + self.height < other.y)
-		else:
-			return False
+	def center(self):
+		return sum([i[0] for i in self.points]) / len(self.points), sum([i[1] for i in self.points]) / len(self.points)
+
+	def rotate(self, (x, y), ang=math.pi / 4):
+		self.points = [(x + (p[0] - x) * math.cos(ang) - (p[1] - y) * math.sin(ang),
+		                y + (p[0] - x) * math.sin(ang) + (p[1] - y) * math.cos(ang)) for p in self.points]
+
+	def move(self, fps):
+		self.points = [(i[0] + self.dx * fps, i[1] + self.dy * fps) for i in self.points]
+
+
+class RegularPolygon(Polygon):
+	def __init__(self, (x, y), s, len, c=(255, 255, 255)):
+		n = math.pi * 2 / s
+		Polygon.__init__(self, [(math.sin(n * i) * len + x, math.cos(n * i) * len + y) for i in range(s)], c)
+
+
+class Rectangle(Polygon):
+	def __init__(self, (x, y), w, h, c=(255, 255, 255)):
+		Polygon.__init__(self, [(x, y), (x + w, y), (x + w, y + h), (x, y + h)], c)
+
+
+def collision(a, b):
+	if isinstance(a, Rectangle) and isinstance(b, Rectangle):
+		# todo: check object's AABBs
+		return False
+	elif isinstance(a, Circle) and isinstance(b, Circle):
+		return (a.radius + b.radius) ** 2 > (a.x - b.x) ** 2 + (a.y - b.y) ** 2
+	else:
+		# todo: add SAT collision
+		return

@@ -1,7 +1,8 @@
 import sys
-from engine import AABB, Circle
 import pygame
 import time
+import engine
+import math
 
 
 def main():
@@ -14,15 +15,11 @@ def main():
 	fps = 1. / 60
 
 	# defining shapes
-	shapes = [AABB(0, 0, 0, screenHeight),
-	          AABB(0, 0, screenWidth, 0),
-	          AABB(screenWidth, 0, 0, screenHeight),
-	          AABB(0, screenHeight, screenWidth, 0)]
-	testCircle1 = AABB(100, 100, 10, 10)
-	testCircle1.applyImpulse(1, .25)
-	testCircle2 = AABB(400, 150, 50, 50)
-	shapes.append(testCircle1)
-	shapes.append(testCircle2)
+	shapes = []
+	shapes.append(engine.Polygon([(100, 100), (150, 100), (100, 150)]))
+	shapes.append(engine.Rectangle((100, 300), 70, 200))
+	shapes.append(engine.Circle((500, 200), 40))
+	shapes.append(engine.RegularPolygon((400, 400), 8, 70))
 
 	while 1:
 		for event in pygame.event.get():
@@ -35,15 +32,17 @@ def main():
 		accumulator += dt;
 		if accumulator > fps:
 			accumulator -= fps
+			# game logic
 			for s in shapes:
 				s.move(fps)
+				s.rotate(s.center(), .01)
 
 		# drawing
 		screen.fill((0, 0, 0))
 		for s in shapes:
 			s.draw(screen)
 		pygame.display.flip()
-		#time.sleep(.005)
+	# time.sleep(.005)
 
 
 if __name__ == "__main__":
