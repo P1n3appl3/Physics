@@ -4,14 +4,44 @@ import math
 import numpy
 
 
+class Scene:
+	shapes = []
+
+	def __init__(self, s=[]):
+		for i in s:
+			self.shapes.append(i)
+
+	def removeEntity(self, e):
+		self.shapes[:] = [i for i in self.shapes if not(i is e)]
+
+	def addEntity(self, e):
+		self.shapes.append(e)
+
+	def draw(self, s):
+		for e in self.shapes:
+			e.draw(s)
+
+
 class Entity:
 	"""Parent class for all physics objects"""
-	dx = dy = dz = 0.
+	dx = 0
+	dy = 0
+	dz = 0
 	color = (255, 255, 255)
 	fixed = False
 	mass = 1.
 	restitution = 1.
-	collisionGroup = 0
+	collisionGroup = 1
+	collisionMask = 1
+
+	def addCollisionMask(self, n):
+		self.collisionMask |= (n+1)
+
+	def removeCollisionMask(self, n):
+		self.collisionMask -= (n+1)**2
+
+	def setCollisionGroup(self, n):
+		self.collisionGroup = 2**n
 
 	@abstractmethod
 	def draw(self, s):
@@ -30,7 +60,7 @@ class Entity:
 		return
 
 	@abstractmethod
-	def setpos(self, (x, y)):
+	def setPos(self, (x, y)):
 		return
 
 
@@ -83,9 +113,9 @@ class Polygon(Entity):
 
 	def rotate(self, (x, y), ang=math.pi / 4):
 		self.points = [(x + (p[0] - x) * math.cos(ang) - (p[1] - y) * math.sin(ang),
-		                y + (p[0] - x) * math.sin(ang) + (p[1] - y) * math.cos(ang)) for p in self.points]
+						y + (p[0] - x) * math.sin(ang) + (p[1] - y) * math.cos(ang)) for p in self.points]
 
-	def setpos(self, pos):
+	def setPos(self, pos):
 		c = self.center()
 		self.points = [(i[0] - c[0] + pos[0], i[1] - c[1] + pos[1]) for i in self.points]
 
@@ -115,6 +145,8 @@ def SAT(v, a, b):
 
 
 def collision(a, b):
+	if b.collisionMask % a.collisionGroup != 0 or a.collisionMask % b.collisionGroup != 0:
+		return False
 	newA = a
 	newB = b
 	if isinstance(a, Circle) and isinstance(b, Circle):
