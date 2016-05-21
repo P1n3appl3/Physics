@@ -2,6 +2,8 @@ import sys
 import pygame
 import time
 import engine
+import math
+import random as r
 
 
 def main():
@@ -10,41 +12,36 @@ def main():
 	screen = pygame.display.set_mode(screenSize)
 
 	currentTime = time.clock()
-	dt = accumulator = 0.
-	fps = 1. / 60
+	accumulator = 0.
 
-	# defining shapes
-	world = engine.Scene()
-	world.addEntity(engine.Polygon([(100, 100), (150, 100), (100, 150)]))
-	world.addEntity(engine.Polygon([(130, 130), (280, 155), (155, 205)]))
-	world.addEntity(engine.Rectangle((200, 300), 70, 200))
-	world.addEntity(engine.Circle((100, 400), 40))
-	world.shapes[3].setCollisionGroup(2)
-	#world.shapes[2].addCollisionMask(2)
-	world.addEntity(engine.RegularPolygon((500, 200), 8, 70))
+	# create test entities
+	world = engine.Scene(screenWidth, screenHeight)
+	for i in range(15):
+		col = (int(r.random() * 255), int(r.random() * 255), int(r.random() * 255))
+		world.shapes.append(engine.Circle((int(r.random() * screenWidth), int(r.random() * screenHeight)), int(r.random() * 30) + 10, col))
+		world.shapes[-1].dx = r.randrange(-400, 400)
+		world.shapes[-1].dy = r.randrange(-400, 400)
+		world.shapes[-1].restitution = .9 + r.random() / 10
+		while any([True if world.collision(world.shapes[n], world.shapes[-1]) else False for n in range(len(world.shapes) - 1)]):
+			world.shapes[-1].setPos((int(r.random() * screenWidth), int(r.random() * screenHeight)))
 
 	while 1:
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				sys.exit()
 
+		# per second stuff
+		if int(time.clock()) > int(currentTime):
+			print sum(int(math.sqrt(s.dx ** 2 + s.dy ** 2)) for s in world.shapes)
+
 		# time calculations
-		dt = time.clock() - currentTime
+		accumulator += time.clock() - currentTime
 		currentTime = time.clock()
-		accumulator += dt
-		accumulator = min(accumulator, 2 * fps)
-		while accumulator > fps:
-			accumulator -= fps
+		accumulator = min(accumulator, 2 * engine.Scene.fps)
+		while accumulator > engine.Scene.fps:
+			accumulator -= engine.Scene.fps
 			# game logic
-			for s in world.shapes:
-				s.move(fps)
-				s.rotate(s.center(), .01)
-				s.color = (255, 255, 255)
-			for x in range(len(world.shapes)):
-				for y in range(len(world.shapes)):
-					if x != y:
-						if engine.collision(world.shapes[x], world.shapes[y]):
-							world.shapes[x].color = (255, 0, 0)
+			world.step()
 
 		# drawing
 		screen.fill((0, 0, 0))
