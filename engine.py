@@ -9,7 +9,7 @@ class Scene:
 	width = 0
 	height = 0
 	bounds = True
-	fps = 1./60
+	fps = 1. / 60
 	maxSpeed = 700
 
 	def __init__(self, w, h, s=[]):
@@ -27,11 +27,14 @@ class Scene:
 	def draw(self, s):
 		for e in self.shapes:
 			e.draw(s)
+			pygame.draw.line(s, (255, 0, 0), (e.x, e.y), (e.x+e.dx/5, e.y+e.dy/5), 2)
 
 	def step(self):
 		c = []
 		for s in range(len(self.shapes)):
-			# self.applyGravity(1.)
+			#self.applyGravity(.25)
+			#self.applyRelativeGravity()
+			self.applyFriction(.00005)
 			self.shapes[s].move(self.fps)
 			self.shapes[s].rotate(self.shapes[s].center(), self.shapes[s].dz)
 			for s2 in range(len(self.shapes)):
@@ -39,6 +42,7 @@ class Scene:
 					if not ((s2, s) in c):
 						if Scene.collision(self.shapes[s], self.shapes[s2]):
 							c.append((s, s2))
+							self.circleBounce(self.shapes[c[-1][0]], self.shapes[c[-1][1]])
 
 			if self.bounds:
 				if self.shapes[s].x + self.shapes[s].radius > self.width:
@@ -54,17 +58,32 @@ class Scene:
 					self.shapes[s].y = 0 + self.shapes[s].radius
 					self.shapes[s].dy *= -self.shapes[s].restitution
 
-		for i in c:
-			self.circleBounce(self.shapes[i[0]], self.shapes[i[1]])
-
 	def applyGravity(self, strength):
 		for s in self.shapes:
 			s.dy = min(s.dy + strength, self.maxSpeed)
+
+	def applyRelativeGravity(self):
+		for s in self.shapes:
+			for s2 in self.shapes:
+				if not(s is s2):
+					norm = numpy.array([s.x - s2.x, s.y - s2.y]) / math.sqrt((s.x - s2.x) ** 2 + (s.y - s2.y) ** 2)
+					s2V = numpy.array([s2.dx, s2.dy]) + norm / (5000. * s.mass)
+
+					s2.dx = s2V[0]
+					s2.dy = s2V[1]
+
+	def applyFriction(self, strength):
+		for s in self.shapes:
+			s.dx *= 1-strength
+			s.dy *= 1-strength
 
 	@staticmethod
 	def circleBounce(a, b):
 		dist = math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 		norm = numpy.array([a.x - b.x, a.y - b.y]) / dist
+		minimumTransVector = norm * (a.radius + b.radius - dist)
+		a.setPos(tuple(numpy.array([a.x, a.y]) + minimumTransVector * a.radius / (a.radius + b.radius)))
+		b.setPos(tuple(numpy.array([b.x, b.y]) - minimumTransVector * b.radius / (a.radius + b.radius)))
 		av = numpy.array([a.dx, a.dy])
 		bv = numpy.array([b.dx, b.dy])
 		r = min(a.restitution, b.restitution)
@@ -75,9 +94,6 @@ class Scene:
 		a.dy = av[1]
 		b.dx = bv[0]
 		b.dy = bv[1]
-		while Scene.collision(a, b):
-			a.move(Scene.fps)
-			b.move(Scene.fps)
 
 	@staticmethod
 	def SAT(v, a, b):
@@ -207,7 +223,7 @@ class Polygon(Entity):
 
 	def rotate(self, (x, y), ang=math.pi / 4):
 		self.points = [(x + (p[0] - x) * math.cos(ang) - (p[1] - y) * math.sin(ang),
-		                y + (p[0] - x) * math.sin(ang) + (p[1] - y) * math.cos(ang)) for p in self.points]
+						y + (p[0] - x) * math.sin(ang) + (p[1] - y) * math.cos(ang)) for p in self.points]
 
 	def setPos(self, pos):
 		c = self.center()
@@ -226,4 +242,3 @@ class RegularPolygon(Polygon):
 class Rectangle(Polygon):
 	def __init__(self, p, w, h, c=(255, 255, 255)):
 		Polygon.__init__(self, [(p[0], p[1]), (p[0] + w, p[1]), (p[0] + w, p[1] + h), (p[0], p[1] + h)], c)
-

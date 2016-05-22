@@ -8,7 +8,7 @@ import random as r
 
 def main():
 	pygame.init()
-	screenSize = screenWidth, screenHeight = 680, 480
+	screenSize = screenWidth, screenHeight = 800, 800
 	screen = pygame.display.set_mode(screenSize)
 
 	currentTime = time.clock()
@@ -16,11 +16,12 @@ def main():
 
 	# create test entities
 	world = engine.Scene(screenWidth, screenHeight)
-	for i in range(15):
+	for i in range(10):
 		col = (int(r.random() * 255), int(r.random() * 255), int(r.random() * 255))
+		speed = 500
 		world.shapes.append(engine.Circle((int(r.random() * screenWidth), int(r.random() * screenHeight)), int(r.random() * 30) + 10, col))
-		world.shapes[-1].dx = r.randrange(-400, 400)
-		world.shapes[-1].dy = r.randrange(-400, 400)
+		world.shapes[-1].dx = r.randrange(-speed, speed)
+		world.shapes[-1].dy = r.randrange(-speed, speed)
 		world.shapes[-1].restitution = .9 + r.random() / 10
 		while any([True if world.collision(world.shapes[n], world.shapes[-1]) else False for n in range(len(world.shapes) - 1)]):
 			world.shapes[-1].setPos((int(r.random() * screenWidth), int(r.random() * screenHeight)))
@@ -47,7 +48,6 @@ def main():
 		screen.fill((0, 0, 0))
 		world.draw(screen)
 		pygame.display.flip()
-	# time.sleep(.005)
 
 
 if __name__ == "__main__":
