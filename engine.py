@@ -9,6 +9,7 @@ class Scene:
 	width = 0
 	height = 0
 	bounds = True
+	boundRect = {}
 	fps = 1. / 60
 	maxSpeed = 700
 
@@ -17,6 +18,8 @@ class Scene:
 		self.height = h
 		for i in s:
 			self.shapes.append(i)
+		self.boundRect = {"top": Rectangle((0, 0), w, 0), "left": Rectangle((0, 0), 0, h),
+		                  "right": Rectangle((w, 0), 0, h), "bottom": Rectangle((0, h), w, 0),}
 
 	def removeEntity(self, e):
 		self.shapes[:] = [i for i in self.shapes if not (i is e)]
@@ -27,14 +30,14 @@ class Scene:
 	def draw(self, s):
 		for e in self.shapes:
 			e.draw(s)
-			pygame.draw.line(s, (255, 0, 0), (e.x, e.y), (e.x+e.dx/5, e.y+e.dy/5), 2)
+			pygame.draw.line(s, (255 - e.color[0], 255 - e.color[1], 255 - e.color[2]), (e.x, e.y), (e.x + e.dx / (e.mass * 4000), e.y + e.dy / (e.mass * 4000)), 2)
 
 	def step(self):
 		c = []
 		for s in range(len(self.shapes)):
-			#self.applyGravity(.25)
-			#self.applyRelativeGravity()
-			self.applyFriction(.00005)
+			# self.applyGravity(.1)
+			# self.applyRelativeGravity()
+			# self.applyFriction(.00005)
 			self.shapes[s].move(self.fps)
 			self.shapes[s].rotate(self.shapes[s].center(), self.shapes[s].dz)
 			for s2 in range(len(self.shapes)):
@@ -65,7 +68,7 @@ class Scene:
 	def applyRelativeGravity(self):
 		for s in self.shapes:
 			for s2 in self.shapes:
-				if not(s is s2):
+				if not (s is s2):
 					norm = numpy.array([s.x - s2.x, s.y - s2.y]) / math.sqrt((s.x - s2.x) ** 2 + (s.y - s2.y) ** 2)
 					s2V = numpy.array([s2.dx, s2.dy]) + norm / (5000. * s.mass)
 
@@ -74,18 +77,41 @@ class Scene:
 
 	def applyFriction(self, strength):
 		for s in self.shapes:
-			s.dx *= 1-strength
-			s.dy *= 1-strength
+			s.dx *= 1 - strength
+			s.dy *= 1 - strength
 
 	@staticmethod
 	def circleBounce(a, b):
 		dist = math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 		norm = numpy.array([a.x - b.x, a.y - b.y]) / dist
 		minimumTransVector = norm * (a.radius + b.radius - dist)
-		a.setPos(tuple(numpy.array([a.x, a.y]) + minimumTransVector * a.radius / (a.radius + b.radius)))
-		b.setPos(tuple(numpy.array([b.x, b.y]) - minimumTransVector * b.radius / (a.radius + b.radius)))
 		av = numpy.array([a.dx, a.dy])
 		bv = numpy.array([b.dx, b.dy])
+		aMag = numpy.linalg.norm(av)
+		bMag = numpy.linalg.norm(bv)
+		a.setPos(tuple(numpy.array([a.x, a.y]) + minimumTransVector * aMag / (aMag + bMag)))
+		b.setPos(tuple(numpy.array([b.x, b.y]) - minimumTransVector * bMag / (aMag + bMag)))
+		r = min(a.restitution, b.restitution)
+		p = 2 * r * ((av[0] * norm[0] + av[1] * norm[1]) - (bv[0] * norm[0] + bv[1] * norm[1])) / (a.mass + b.mass)
+		av = av - p * a.mass * norm
+		bv = bv + p * b.mass * norm
+		a.dx = av[0]
+		a.dy = av[1]
+		b.dx = bv[0]
+		b.dy = bv[1]
+
+	@staticmethod
+	def polyBounce(a, b, minTrans):
+		# todo: make SAT return minTrans so that this works
+		dist = math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
+		norm = numpy.array([a.x - b.x, a.y - b.y]) / dist
+		minimumTransVector = norm * minTrans
+		av = numpy.array([a.dx, a.dy])
+		bv = numpy.array([b.dx, b.dy])
+		aMag = numpy.linalg.norm(av)
+		bMag = numpy.linalg.norm(bv)
+		a.setPos(tuple(numpy.array([a.x, a.y]) + minimumTransVector * aMag / (aMag + bMag)))
+		b.setPos(tuple(numpy.array([b.x, b.y]) - minimumTransVector * bMag / (aMag + bMag)))
 		r = min(a.restitution, b.restitution)
 		p = 2 * r * ((av[0] * norm[0] + av[1] * norm[1]) - (bv[0] * norm[0] + bv[1] * norm[1])) / (a.mass + b.mass)
 		av = av - p * a.mass * norm
@@ -130,7 +156,6 @@ class Scene:
 				return False
 		return True
 
-
 class Entity:
 	"""Parent class for all physics objects"""
 	dx = 0.
@@ -151,6 +176,9 @@ class Entity:
 
 	def setCollisionGroup(self, n):
 		self.collisionGroup = 2 ** n
+
+	def __init__(self):
+		return
 
 	@abstractmethod
 	def draw(self, s):
@@ -214,16 +242,23 @@ class Polygon(Entity):
 	def __init__(self, p, c=(255, 255, 255)):
 		self.points = p
 		self.color = c
+		(self.x, self.y) = self.center()
+		self.mass = self.area()
 
 	def draw(self, s):
 		pygame.draw.polygon(s, self.color, self.points, 0)
 
 	def center(self):
-		return sum([i[0] for i in self.points]) / len(self.points), sum([i[1] for i in self.points]) / len(self.points)
+		return sum(((float(i[0]) for i in self.points))) / len(self.points), sum(
+			(float(i[1]) for i in self.points)) / len(self.points)
+
+	def area(self):
+		return sum(self.points[i][0] * self.points[i + 1 if i < len(self.points) - 1 else 0][1] - self.points[i][1] *
+		           self.points[i + 1 if i < len(self.points) - 1 else 0][0] for i in range(len(self.points))) / 2
 
 	def rotate(self, (x, y), ang=math.pi / 4):
 		self.points = [(x + (p[0] - x) * math.cos(ang) - (p[1] - y) * math.sin(ang),
-						y + (p[0] - x) * math.sin(ang) + (p[1] - y) * math.cos(ang)) for p in self.points]
+		                y + (p[0] - x) * math.sin(ang) + (p[1] - y) * math.cos(ang)) for p in self.points]
 
 	def setPos(self, pos):
 		c = self.center()
@@ -231,6 +266,7 @@ class Polygon(Entity):
 
 	def move(self, fps):
 		self.points = [(i[0] + self.dx * fps, i[1] + self.dy * fps) for i in self.points]
+		(self.x, self.y) = self.center()
 
 
 class RegularPolygon(Polygon):

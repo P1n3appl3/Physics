@@ -16,13 +16,13 @@ def main():
 
 	# create test entities
 	world = engine.Scene(screenWidth, screenHeight)
-	for i in range(10):
+	for i in range(15):
 		col = (int(r.random() * 255), int(r.random() * 255), int(r.random() * 255))
-		speed = 500
+		speed = 700
 		world.shapes.append(engine.Circle((int(r.random() * screenWidth), int(r.random() * screenHeight)), int(r.random() * 30) + 10, col))
 		world.shapes[-1].dx = r.randrange(-speed, speed)
 		world.shapes[-1].dy = r.randrange(-speed, speed)
-		world.shapes[-1].restitution = .9 + r.random() / 10
+		world.shapes[-1].restitution = .8 + r.random() / 10
 		while any([True if world.collision(world.shapes[n], world.shapes[-1]) else False for n in range(len(world.shapes) - 1)]):
 			world.shapes[-1].setPos((int(r.random() * screenWidth), int(r.random() * screenHeight)))
 
@@ -39,8 +39,8 @@ def main():
 		accumulator += time.clock() - currentTime
 		currentTime = time.clock()
 		accumulator = min(accumulator, 2 * engine.Scene.fps)
-		while accumulator > engine.Scene.fps:
-			accumulator -= engine.Scene.fps
+		while accumulator > world.fps:
+			accumulator -= world.fps
 			# game logic
 			world.step()
 
