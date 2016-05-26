@@ -14,16 +14,24 @@ def main():
 	currentTime = time.clock()
 	accumulator = 0.
 
+	energy = 0
+
 	# create test entities
 	world = engine.Scene(screenWidth, screenHeight)
-	for i in range(15):
+	for i in range(10):
 		col = (int(r.random() * 255), int(r.random() * 255), int(r.random() * 255))
 		speed = 700
-		world.shapes.append(engine.Circle((int(r.random() * screenWidth), int(r.random() * screenHeight)), int(r.random() * 30) + 10, col))
+		if r.random() > .49:
+			world.shapes.append(engine.RegularPolygon((int(r.random() * screenWidth), int(r.random() * screenHeight)),
+		                                          int(r.random() * 2) + 3, int(r.random() * 40) + 10))
+		else:
+			world.shapes.append(engine.Circle((int(r.random() * screenWidth), int(r.random() * screenHeight)),
+		                                          int(r.random() * 10) + 30))
 		world.shapes[-1].dx = r.randrange(-speed, speed)
 		world.shapes[-1].dy = r.randrange(-speed, speed)
-		world.shapes[-1].restitution = .8 + r.random() / 10
-		while any([True if world.collision(world.shapes[n], world.shapes[-1]) else False for n in range(len(world.shapes) - 1)]):
+		world.shapes[-1].restitution = .49 + r.random() / 100
+		while any([True if world.collision(world.shapes[n], world.shapes[-1]) else False for n in
+		           range(len(world.shapes) - 1)]):
 			world.shapes[-1].setPos((int(r.random() * screenWidth), int(r.random() * screenHeight)))
 
 	while 1:
@@ -33,7 +41,7 @@ def main():
 
 		# per second stuff
 		if int(time.clock()) > int(currentTime):
-			print sum(int(math.sqrt(s.dx ** 2 + s.dy ** 2)) for s in world.shapes)
+			print "Energy: "+ str(energy) + "  Entities: " + str(len(world.shapes))
 
 		# time calculations
 		accumulator += time.clock() - currentTime
@@ -42,11 +50,14 @@ def main():
 		while accumulator > world.fps:
 			accumulator -= world.fps
 			# game logic
-			world.step()
+			energy = int(sum(int(math.sqrt(s.dx ** 2 + s.dy ** 2)) for s in world.shapes))
+			if not(pygame.key.get_pressed()[pygame.K_SPACE]):
+				world.step()
 
 		# drawing
-		screen.fill((0, 0, 0))
+		screen.fill((100, 100, 100))
 		world.draw(screen)
+		screen.blit(pygame.font.Font(None, 40).render(str(energy), False, (0, 0, 0)), (0, 0))
 		pygame.display.flip()
 
 

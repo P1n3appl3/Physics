@@ -18,8 +18,6 @@ class Scene:
 		self.height = h
 		for i in s:
 			self.shapes.append(i)
-		self.boundRect = {"top": Rectangle((0, 0), w, 0), "left": Rectangle((0, 0), 0, h),
-		                  "right": Rectangle((w, 0), 0, h), "bottom": Rectangle((0, h), w, 0),}
 
 	def removeEntity(self, e):
 		self.shapes[:] = [i for i in self.shapes if not (i is e)]
@@ -30,36 +28,47 @@ class Scene:
 	def draw(self, s):
 		for e in self.shapes:
 			e.draw(s)
-			pygame.draw.line(s, (255 - e.color[0], 255 - e.color[1], 255 - e.color[2]), (e.x, e.y), (e.x + e.dx / (e.mass * 4000), e.y + e.dy / (e.mass * 4000)), 2)
+			x, y = e.center()
+			pygame.draw.line(s, (255 - e.color[0], 255 - e.color[1], 255 - e.color[2]), (x, y),
+			                 (x + e.dx / (e.mass * 5000), y + e.dy / (e.mass * 5000)), 2)
 
 	def step(self):
-		c = []
+		collisionPairs = []
 		for s in range(len(self.shapes)):
 			# self.applyGravity(.1)
 			# self.applyRelativeGravity()
 			# self.applyFriction(.00005)
 			self.shapes[s].move(self.fps)
 			self.shapes[s].rotate(self.shapes[s].center(), self.shapes[s].dz)
+			self.shapes[s].color = (255, 255, 255)
+			broad = AABB(self.shapes[s])
 			for s2 in range(len(self.shapes)):
+				broad2 = AABB(self.shapes[s2])
 				if s != s2:
-					if not ((s2, s) in c):
-						if Scene.collision(self.shapes[s], self.shapes[s2]):
-							c.append((s, s2))
-							self.circleBounce(self.shapes[c[-1][0]], self.shapes[c[-1][1]])
+					if not ((s2, s) in collisionPairs):
+						if broad.intersect(broad2):
+							collisionPairs.append((s, s2))
 
 			if self.bounds:
-				if self.shapes[s].x + self.shapes[s].radius > self.width:
-					self.shapes[s].x = self.width - self.shapes[s].radius
+				center = self.shapes[s].center()
+				if broad.right > self.width:
+					self.shapes[s].setPos((self.width - (broad.right - center[0]), center[1]))
 					self.shapes[s].dx *= -self.shapes[s].restitution
-				if self.shapes[s].y + self.shapes[s].radius > self.height:
-					self.shapes[s].y = self.height - self.shapes[s].radius
+				if broad.top > self.height:
+					self.shapes[s].setPos((center[0], self.height - (broad.top - center[1])))
 					self.shapes[s].dy *= -self.shapes[s].restitution
-				if self.shapes[s].x - self.shapes[s].radius < 0:
-					self.shapes[s].x = 0 + self.shapes[s].radius
+				if broad.left < 0:
+					self.shapes[s].setPos((center[0] - broad.left, center[1]))
 					self.shapes[s].dx *= -self.shapes[s].restitution
-				if self.shapes[s].y - self.shapes[s].radius < 0:
-					self.shapes[s].y = 0 + self.shapes[s].radius
+				if broad.bottom < 0:
+					self.shapes[s].setPos((center[0], center[1] - broad.bottom))
 					self.shapes[s].dy *= -self.shapes[s].restitution
+
+		for c in collisionPairs:
+			if Scene.collision(self.shapes[c[0]], self.shapes[c[1]]):
+				self.shapes[c[0]].color = (255, 0, 0)
+				self.shapes[c[1]].color = (255, 0, 0)
+			# self.circleBounce(self.shapes[c[-1][0]], self.shapes[c[-1][1]])
 
 	def applyGravity(self, strength):
 		for s in self.shapes:
@@ -68,8 +77,10 @@ class Scene:
 	def applyRelativeGravity(self):
 		for s in self.shapes:
 			for s2 in self.shapes:
+				x, y = s.center()
+				x2, y2 = s2.center()
 				if not (s is s2):
-					norm = numpy.array([s.x - s2.x, s.y - s2.y]) / math.sqrt((s.x - s2.x) ** 2 + (s.y - s2.y) ** 2)
+					norm = numpy.array([x - x2, y - y2]) / math.sqrt((x - x2) ** 2 + (y - y2) ** 2)
 					s2V = numpy.array([s2.dx, s2.dy]) + norm / (5000. * s.mass)
 
 					s2.dx = s2V[0]
@@ -155,6 +166,7 @@ class Scene:
 			if not (Scene.SAT((temp[1] * -1, temp[0]), newA.points, newB.points)):
 				return False
 		return True
+
 
 class Entity:
 	"""Parent class for all physics objects"""
@@ -242,8 +254,7 @@ class Polygon(Entity):
 	def __init__(self, p, c=(255, 255, 255)):
 		self.points = p
 		self.color = c
-		(self.x, self.y) = self.center()
-		self.mass = self.area()
+		self.mass = 1. / self.area()
 
 	def draw(self, s):
 		pygame.draw.polygon(s, self.color, self.points, 0)
@@ -253,8 +264,8 @@ class Polygon(Entity):
 			(float(i[1]) for i in self.points)) / len(self.points)
 
 	def area(self):
-		return sum(self.points[i][0] * self.points[i + 1 if i < len(self.points) - 1 else 0][1] - self.points[i][1] *
-		           self.points[i + 1 if i < len(self.points) - 1 else 0][0] for i in range(len(self.points))) / 2
+		return abs(sum(self.points[i][0] * self.points[i + 1 if i < len(self.points) - 1 else 0][1] - self.points[i][1] *
+		           self.points[i + 1 if i < len(self.points) - 1 else 0][0] for i in range(len(self.points))) / 2)
 
 	def rotate(self, (x, y), ang=math.pi / 4):
 		self.points = [(x + (p[0] - x) * math.cos(ang) - (p[1] - y) * math.sin(ang),
@@ -266,7 +277,6 @@ class Polygon(Entity):
 
 	def move(self, fps):
 		self.points = [(i[0] + self.dx * fps, i[1] + self.dy * fps) for i in self.points]
-		(self.x, self.y) = self.center()
 
 
 class RegularPolygon(Polygon):
@@ -278,3 +288,27 @@ class RegularPolygon(Polygon):
 class Rectangle(Polygon):
 	def __init__(self, p, w, h, c=(255, 255, 255)):
 		Polygon.__init__(self, [(p[0], p[1]), (p[0] + w, p[1]), (p[0] + w, p[1] + h), (p[0], p[1] + h)], c)
+
+
+class AABB:
+	top = float('-inf')
+	bottom = float('inf')
+	left = float('inf')
+	right = float('-inf')
+
+	def __init__(self, s):
+		if isinstance(s, Circle):
+			self.top = s.y + s.radius
+			self.bottom = s.y - s.radius
+			self.left = s.x - s.radius
+			self.right = s.x + s.radius
+		else:
+			for p in s.points:
+				self.left = p[0] if p[0] < self.left else self.left
+				self.right = p[0] if p[0] > self.right else self.right
+				self.top = p[1] if p[1] > self.top else self.top
+				self.bottom = p[1] if p[1] < self.bottom else self.bottom
+
+	def intersect(self, other):
+		return not (
+			self.bottom > other.top or self.top < other.bottom or self.left > other.right or self.right < other.left)
